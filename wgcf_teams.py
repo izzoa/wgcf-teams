@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 
 import requests
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
+from tqdm import tqdm
 from cryptography.hazmat.primitives.serialization import (
     Encoding,
     NoEncryption,
@@ -21,7 +22,7 @@ from cryptography.hazmat.primitives.serialization import (
 )
 
 API_ENDPOINT = "https://zero-trust-client.cloudflareclient.com/v0i2308311933/reg"
-INSTRUCTION_URL = "https://github.com/poscat0x04/wgcf-teams/blob/master/guide.md"
+INSTRUCTION_URL = "https://github.com/izzoa/wgcf-teams/blob/master/guide.md"
 
 V4_DNS = "1.1.1.1"
 V6_DNS = "2606:4700:4700::1111"
@@ -124,7 +125,6 @@ def get_jwt_token(token_arg: str | None) -> str:
     token = sys.stdin.readline().strip()
     if not token:
         raise ValueError("No token provided")
-    print(f"Token received ({len(token)} chars)", file=sys.stderr, flush=True)
     return token
 
 
@@ -156,9 +156,7 @@ def register_device(privkey: X25519PrivateKey, token: str) -> dict:
         "device_token": "",
     }
     
-    print("Registering device with Cloudflare...", file=sys.stderr, flush=True)
-    
-    # Make registration request
+    # Make registration request (loading indicator handled in main())
     response = session.post(
         API_ENDPOINT,
         json=payload,
@@ -166,7 +164,8 @@ def register_device(privkey: X25519PrivateKey, token: str) -> dict:
         timeout=30
     )
     
-    print(f"Response status: {response.status_code}", file=sys.stderr, flush=True)
+    if response.status_code != 200:
+        raise RuntimeError(f"Registration failed with status {response.status_code}")
     
     data = response.json()
     
@@ -232,8 +231,17 @@ def main():
     try:
         privkey = get_or_generate_privkey(args.prompt)
         token = get_jwt_token(args.token)
-        result = register_device(privkey, token)
-        config = build_wireguard_config(privkey, result)
+        
+        # Show processing indicator after token is received
+        print("\n", file=sys.stderr, flush=True)  # Add spacing after token input
+        with tqdm(desc="Processing token and registering device", unit="", bar_format="{desc}... {elapsed}", file=sys.stderr, ncols=80, leave=False) as pbar:
+            result = register_device(privkey, token)
+            pbar.update(1)
+        
+        # Build config (fast operation, but show completion)
+        with tqdm(desc="Generating WireGuard config", unit="", bar_format="{desc}... {elapsed}", file=sys.stderr, ncols=80, leave=False) as pbar:
+            config = build_wireguard_config(privkey, result)
+            pbar.update(1)
         
         # Print to terminal
         print(config)
@@ -242,7 +250,8 @@ def main():
         with open("output.conf", "w") as f:
             f.write(config)
             f.write("\n")
-        print("\nConfig written to output.conf", file=sys.stderr, flush=True)
+        
+        print("\n✓ Config written to output.conf", file=sys.stderr, flush=True)
         
     except KeyboardInterrupt:
         print("\nAborted.", file=sys.stderr)
