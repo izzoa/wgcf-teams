@@ -108,17 +108,18 @@ def get_jwt_token(token_arg: str | None) -> str:
             return token_arg.strip()
     
     # Interactive prompt
-    print(
-        "Please open https://<YOUR_ORGANIZATION>.cloudflareaccess.com/warp, "
-        "log in to WARP, paste the JWT token here and press enter.",
-        file=sys.stderr,
-        flush=True
-    )
-    print(
-        f"For a detailed instruction on where to find the JWT token after login, see {INSTRUCTION_URL}.",
-        file=sys.stderr,
-        flush=True
-    )
+    print("\n" + "="*70, file=sys.stderr, flush=True)
+    print("JWT Token Required", file=sys.stderr, flush=True)
+    print("="*70, file=sys.stderr, flush=True)
+    print("\nTo get your JWT token:", file=sys.stderr, flush=True)
+    print("  1. Open https://<YOUR_ORGANIZATION>.cloudflareaccess.com/warp", file=sys.stderr, flush=True)
+    print("  2. Log in with your organization credentials", file=sys.stderr, flush=True)
+    print("  3. Open Developer Tools (F12) → Application → Cookies", file=sys.stderr, flush=True)
+    print("  4. Copy the value of the 'CF_Authorization' cookie", file=sys.stderr, flush=True)
+    print(f"\nFor detailed instructions: {INSTRUCTION_URL}", file=sys.stderr, flush=True)
+    print("\n" + "-"*70, file=sys.stderr, flush=True)
+    print("Paste your JWT token below and press Enter:", file=sys.stderr, flush=True)
+    print("> ", end="", file=sys.stderr, flush=True)
     # Use readline directly to handle long tokens better
     token = sys.stdin.readline().strip()
     if not token:
