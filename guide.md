@@ -103,9 +103,9 @@ python wgcf_teams.py -t token.txt
 - **Browser permissions**: Some browsers require enabling Developer Tools in settings
 - **Private/Incognito mode**: Developer Tools work in private browsing, but cookies may behave differently
 
-## Visual Guide
+## Guide
 
-While we can't include screenshots here, the general layout in Developer Tools should look like this:
+The general layout in Developer Tools should look like this:
 
 ```
 Developer Tools
