@@ -107,7 +107,7 @@ def get_jwt_token(token_arg: str | None) -> str:
             # Assume it's the token itself
             print(f"Token provided via argument ({len(token_arg)} chars)", file=sys.stderr, flush=True)
             return token_arg.strip()
-    
+
     # Interactive prompt
     print("\n" + "="*70, file=sys.stderr, flush=True)
     print("JWT Token Required", file=sys.stderr, flush=True)
@@ -121,8 +121,18 @@ def get_jwt_token(token_arg: str | None) -> str:
     print("\n" + "-"*70, file=sys.stderr, flush=True)
     print("Paste your JWT token below and press Enter:", file=sys.stderr, flush=True)
     print("> ", end="", file=sys.stderr, flush=True)
-    # Use readline directly to handle long tokens better
-    token = sys.stdin.readline().strip()
+    
+    # Read token using sys.stdin.read() with a delimiter approach to handle
+    # very long tokens that may exceed readline buffer limits.
+    # Also handles special characters that could be interpreted by terminal.
+    token_parts = []
+    while True:
+        chunk = sys.stdin.read(1)
+        if chunk == '\n' or chunk == '':
+            break
+        token_parts.append(chunk)
+    token = ''.join(token_parts).strip()
+    
     if not token:
         raise ValueError("No token provided")
     return token
@@ -145,7 +155,7 @@ def build_session() -> requests.Session:
 def register_device(privkey: X25519PrivateKey, token: str) -> dict:
     """Register device with Cloudflare's Zero Trust API."""
     session = build_session()
-    
+
     # Build registration payload
     pubkey = public_key_to_base64(privkey)
     payload = {
@@ -155,7 +165,7 @@ def register_device(privkey: X25519PrivateKey, token: str) -> dict:
         "fcm_token": "",
         "device_token": "",
     }
-    
+
     # Make registration request (loading indicator handled in main())
     response = session.post(
         API_ENDPOINT,
@@ -163,12 +173,12 @@ def register_device(privkey: X25519PrivateKey, token: str) -> dict:
         headers={"Cf-Access-Jwt-Assertion": token},
         timeout=30
     )
-    
+
     if response.status_code != 200:
         raise RuntimeError(f"Registration failed with status {response.status_code}")
-    
+
     data = response.json()
-    
+
     if not data.get("success") or data.get("result") is None:
         errors = data.get("errors", [])
         messages = data.get("messages", [])
@@ -178,81 +188,83 @@ def register_device(privkey: X25519PrivateKey, token: str) -> dict:
         if messages:
             error_msg += f"Messages: {messages}\n"
         raise RuntimeError(error_msg)
-    
+
     return data["result"]
 
 
 def build_wireguard_config(privkey: X25519PrivateKey, result: dict) -> str:
     """Build WireGuard configuration string from API response."""
     config = result["config"]
-    
+
     # Extract routing ID (base64 decode client_id to get 3 bytes)
     client_id_b64 = config["client_id"]
     client_id_bytes = base64.b64decode(client_id_b64)
+    reserved_bytes = list(client_id_bytes[:3])  # Get as list of ints
     routing_id_hex = client_id_bytes[:3].hex()
-    
+
     # Extract peer info
-    peer = config["peers"][0]
+    peer = config["peers"] [0]
     peer_pubkey = peer["public_key"]
-    endpoint = peer["endpoint"]["host"]
-    
+    endpoint = peer["endpoint"] ["host"]
+
     # Extract interface addresses
-    addresses = config["interface"]["addresses"]
+    addresses = config["interface"] ["addresses"]
     v4_addr = addresses["v4"]
     v6_addr = addresses["v6"]
-    
+
     # Build config string
     privkey_b64 = private_key_to_base64(privkey)
-    
+
     lines = [
         f"# routing-id: 0x{routing_id_hex}",
+        f"# reserved bytes: {reserved_bytes}",
+        f"# NOTE: Standard WireGuard doesn't support 'reserved' field!",
+        f"# You need a compatible client (Xray-core, Amnezia, warp.sh, etc.)",
         "[Interface]",
         f"PrivateKey = {privkey_b64}",
-        f"Address = {v6_addr}/128",
-        f"Address = {v4_addr}/32",
-        f"DNS = {V4_DNS}",
-        f"DNS = {V6_DNS}",
+        f"Address = {v6_addr}/128, {v4_addr}/32",
+        f"DNS = {V4_DNS}, {V6_DNS}",
         f"MTU = {WG_MTU}",
         "",
         "[Peer]",
         f"PublicKey = {peer_pubkey}",
-        "AllowedIPs = ::/0",
-        "AllowedIPs = 0.0.0.0/0",
+        "AllowedIPs = 0.0.0.0/0, ::/0",
         f"Endpoint = {endpoint}",
+        "PersistentKeepalive = 25",
     ]
-    
+
     return "\n".join(lines)
 
 
 def main():
     """Main entry point."""
     args = parse_args()
-    
+
     try:
         privkey = get_or_generate_privkey(args.prompt)
         token = get_jwt_token(args.token)
-        
+
         # Show processing indicator after token is received
         print("\n", file=sys.stderr, flush=True)  # Add spacing after token input
         with tqdm(desc="Processing token and registering device", unit="", bar_format="{desc}... {elapsed}", file=sys.stderr, ncols=80, leave=False) as pbar:
             result = register_device(privkey, token)
             pbar.update(1)
-        
+
         # Build config (fast operation, but show completion)
         with tqdm(desc="Generating WireGuard config", unit="", bar_format="{desc}... {elapsed}", file=sys.stderr, ncols=80, leave=False) as pbar:
             config = build_wireguard_config(privkey, result)
             pbar.update(1)
-        
+
         # Print to terminal
         print(config)
-        
+
         # Write to output.conf
         with open("output.conf", "w") as f:
             f.write(config)
             f.write("\n")
-        
+
         print("\n✓ Config written to output.conf", file=sys.stderr, flush=True)
-        
+
     except KeyboardInterrupt:
         print("\nAborted.", file=sys.stderr)
         sys.exit(1)
@@ -263,4 +275,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

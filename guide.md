@@ -124,5 +124,5 @@ The `CF_Authorization` cookie's value field contains your JWT token.
 If you continue to have issues:
 1. Verify you have access to WARP for Teams in your organization
 2. Contact your organization's IT administrator
-3. Check the [main README](../README.md) for additional troubleshooting
+3. Check the main [README](../README.md) for additional troubleshooting
 

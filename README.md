@@ -64,20 +64,26 @@ The tool will:
 
 ```ini
 # routing-id: 0xabc123
+# reserved bytes: [171, 193, 35]
+# NOTE: Standard WireGuard doesn't support 'reserved' field!
+# You need a compatible client (Xray-core, Amnezia, warp.sh, etc.)
 [Interface]
 PrivateKey = <generated-private-key>
-Address = 2606:4700:xxx:xxxx::x/128
-Address = 100.96.x.x/32
-DNS = 1.1.1.1
-DNS = 2606:4700:4700::1111
+Address = 2606:4700:xxx:xxxx::x/128, 100.96.x.x/32
+DNS = 1.1.1.1, 2606:4700:4700::1111
 MTU = 1420
 
 [Peer]
 PublicKey = bmXOC+F1FxEMF9dyjK2H5/1SUtzH0JuVo51h2wPfgyo=
-AllowedIPs = ::/0
-AllowedIPs = 0.0.0.0/0
+AllowedIPs = 0.0.0.0/0, ::/0
 Endpoint = engage.cloudflareclient.com:2408
+PersistentKeepalive = 25
 ```
+
+> **Important:** Standard WireGuard clients do not support the `reserved` bytes required by Cloudflare WARP. You must use a compatible client that supports this field, such as:
+> - [Xray-core](https://github.com/XTLS/Xray-core)
+> - [Amnezia VPN](https://amnezia.org/)
+> - [warp.sh](https://gitlab.com/fscarmen/warp)
 
 ## Troubleshooting
 
